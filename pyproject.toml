@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "multivariatepolynomial"
+version = "0.9"
+description = "Multivariate Polynomials."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+authors = [
+  {name="Sebastian Gössl", email="goessl@student.tugraz.at"}
+]
+dependencies = [
+  "numpy",
+  "sympy"
+]
+
+[project.urls]
+Homepage = "https://github.com/goessl/multivariatepolynomial"
+Documentation = "https://goessl.github.io/multivariatepolynomial"
+Repository = "https://github.com/goessl/multivariatepolynomial.git"
+
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "scikit-learn"
+]
