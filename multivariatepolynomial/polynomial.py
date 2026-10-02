@@ -306,6 +306,22 @@ class Polynomial:
             np.sum(np.abs(A*self.coefs), axis=-1)
         )
     
+    def to_dense(self) -> NDArray:
+        """Return as a dense coefficient array.
+        
+        Will have as many axes as features.
+        
+        Returns
+        -------
+        :
+            Dense coefficient array.
+        """
+        degrees = np.max(self.pows, axis=0, initial=0).astype(int)
+        C = np.zeros(degrees+1, dtype=self.coefs.dtype)
+        for k, v in self:
+            C[k] += v
+        return C
+    
     def to_sympy(self, *gens: Symbol, trim: bool=True) -> Poly:
         """Return as a `sympy.Poly`.
         

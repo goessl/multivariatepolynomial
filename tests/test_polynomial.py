@@ -51,3 +51,15 @@ def test_explicit_polynomial():
     f, p = Polynomial.fit_explicit(X, np.ones_like(a), pows)
     assert f
     assert np.allclose(p.coefs, [1/2**2, 1/3**2])
+    
+    
+    #parabola
+    x = 5*np.random.rand(1000) - 5
+    y = 1 + 2*x + 3*x**2
+    X = np.column_stack([x])
+    
+    pows = [(0,), (1,), (2,)]
+    f, p = Polynomial.fit_explicit(X, y, pows)
+    assert f
+    assert np.allclose(p.coefs, [1, 2, 3])
+    assert np.allclose(p.to_dense(), [1, 2, 3])
