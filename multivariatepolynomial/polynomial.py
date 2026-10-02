@@ -9,7 +9,7 @@ from numpy.typing import ArrayLike, NDArray
 from sympy import Symbol, symbols, Poly
 from .util import _rank, _safe_div, transform
 from typing import Any, Final, Self
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 
 
@@ -31,14 +31,16 @@ class Polynomial:
     
     
     @classmethod
-    def fit_implicit(cls, X: ArrayLike, pows: ArrayLike) \
+    def fit_implicit(cls, X: ArrayLike, pows: ArrayLike, *,
+            nullspace: Callable[[NDArray], NDArray]|None=None) \
             -> tuple[bool, tuple[Self, ...]]:
         """Return fitted implicit `Polynomial`s.
         
         Flag is `True` if a single polynomial converged.
         `False` if either none or more than one converged.
         
-        If none converged, the best candidate is still returned.
+        If none converged, the best candidate is still returned
+        (without custom `nullspace` argument).
         If one or more converged, all converged are returned.
         
         Parameters
@@ -47,6 +49,9 @@ class Polynomial:
             Samples. Two dimensional `(n_samples, n_features)`.
         pows
             Monomial exponents. Two dimensional `(n_terms, n_features)`.
+        nullspace
+            Optional custom nullspace calculating function.
+            Should accept the design matrix and return a kernel basis as columns.
         
         Returns
         -------
@@ -66,23 +71,27 @@ class Polynomial:
         
         A = transform(X, pows)
         
-        #keep singular values for diagnostics
-        _, S, Vt = np.linalg.svd(A, full_matrices=A.shape[0]<A.shape[1])
-        K = Vt.conj().T #vectors as columns
-        k = pows.shape[0] - _rank(S, A.shape)
+        if nullspace is None:
+            #keep singular values for diagnostics
+            _, S, Vt = np.linalg.svd(A, full_matrices=A.shape[0]<A.shape[1])
+            K = Vt.conj().T[:,::-1] #vectors as columns, starting with best
+            k = pows.shape[0] - _rank(S, A.shape)
+        else:
+            K = nullspace(A)
+            k = K.shape[1]
         
-        if k == 0 and len(S) == 0: #no solution at all
-            warn('Fit didn\'t converge!', UserWarning, stacklevel=2)
+        if k==0 and K.shape[1]==0: #no solution at all
+            warn('No solution found!', UserWarning, stacklevel=2)
             return False, ()
-        elif k == 0 and len(S) > 0: #no exact solution
-            warn(f'Fit didn\'t converge: {S[-1]}!', UserWarning, stacklevel=2)
-            return False, (cls(K[:,-1], pows),) #still return best candidate
+        elif k==0 and K.shape[1]>0: #no exact solution
+            warn('Fit didn\'t converge!', UserWarning, stacklevel=2)
+            return False, (cls(K[:,0], pows),) #still return best candidate
         elif k > 1: #multiple exact solutions
             warn(f'Kernel dimensionality {k}; solution is not unique!',
                     UserWarning, stacklevel=2)
-            return False, tuple(cls(c, pows) for c in reversed(K[:,-k:].T))
+            return False, tuple(cls(c, pows) for c in K[:,:k].T)
         #one exact solution
-        return True, (cls(K[:,-1], pows),)
+        return True, (cls(K[:,0], pows),)
     
     @classmethod
     def fit_explicit(cls, X: ArrayLike, y: ArrayLike, pows: ArrayLike) \
@@ -134,7 +143,8 @@ class Polynomial:
         #minimum norm least squares
         c, _, r, S = np.linalg.lstsq(A, y)
         k = pows.shape[0] - r
-        #exact if the residual vanishes, zero tolerance like the rank of (A|y)
+        #don't package polynomial and calculate residual with it
+        #because it would calculate the transformation matrix again
         res = np.linalg.norm(A@c - y)
         tol = max(A.shape[0], A.shape[1]+1) * np.finfo(S.dtype).eps \
                 * max(S.max(initial=0), np.linalg.norm(y))
